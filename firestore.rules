@@ -1,0 +1,198 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.uid == 'ADMIN_GOOGLE_UID_DOPLNIT';
+    }
+
+    function isSelf(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function nowMs() { return request.time.toMillis(); }
+
+    function raceOpen(raceId, session) {
+      return get(/databases/$(database)/documents/races/$(raceId))
+               .data.get(session + 'DeadlineMs', 0) > nowMs();
+    }
+
+    /* Fail-closed: nevyplněná uzávěrka znamená ZAVŘENO, ne otevřeno.
+       Navíc se zamkne, jakmile správce vyplní jakýkoli sezónní výsledek.
+       Appka ukládá results vždy se všemi třemi klíči (i prázdnými), proto se
+       testují hodnoty, ne počet klíčů. */
+    function seasonOpen(year) {
+      return seasonMs(year) > nowMs() && seasonResultsEmpty(year);
+    }
+    function seasonMs(year) {
+      return get(/databases/$(database)/documents/seasons/$(year))
+               .data.get('tipsDeadlineMs', 0);
+    }
+    function seasonResultsEmpty(year) {
+      return get(/databases/$(database)/documents/seasons/$(year))
+               .data.get('results', {}).get('wdc', '') == ''
+          && get(/databases/$(database)/documents/seasons/$(year))
+               .data.get('results', {}).get('wcc', '') == ''
+          && get(/databases/$(database)/documents/seasons/$(year))
+               .data.get('results', {}).get('flap', '') == '';
+    }
+
+    function tipKeys() {
+      return ['nick','slug','joinedAt','races','season',
+              'touchedRace','touchedSession','touchedSeason'];
+    }
+
+    /* Soukromý dokument tips/{uid}/private/data drží všechny tipy včetně těch na
+       ještě otevřené sekce. Nick ani joinedAt v něm nejsou — ty zůstávají veřejné. */
+    function privKeys() {
+      return ['races','season','touchedRace','touchedSession','touchedSeason'];
+    }
+    function privOf(uid) {
+      return get(/databases/$(database)/documents/tips/$(uid)/private/data).data;
+    }
+
+    function baseUnchanged() {
+      return request.resource.data.keys().hasOnly(tipKeys())
+          && request.resource.data.nick     == resource.data.nick
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          /* get() s výchozí hodnotou kvůli starším dokumentům, které slug nemají */
+          && request.resource.data.get('slug', '') == resource.data.get('slug', '');
+    }
+
+    function raceTipWrite() {
+      let d   = request.resource.data;
+      let old = resource.data;
+      let rid = d.touchedRace;
+      let ses = d.touchedSession;
+      return d.season.diff(old.season).affectedKeys().size() == 0
+          && rid is string && rid.size() > 0
+          && ses in ['quali','sprint','race']
+          && d.races.diff(old.races).affectedKeys().hasOnly([rid])
+          && d.races[rid]
+               .diff(old.races.get(rid, {}))
+               .affectedKeys().hasOnly([ses, 'updatedAt'])
+          && d.races[rid].keys().hasOnly(['quali','sprint','race','updatedAt'])
+          && d.races[rid][ses] is list
+          /* kvalifikace má 3 pozice, sprint 8, závod 10 */
+          && d.races[rid][ses].size() <= (ses == 'quali' ? 3 : (ses == 'sprint' ? 8 : 10))
+          && d.races[rid].updatedAt is string
+          && d.races[rid].updatedAt.size() <= 30
+          && raceOpen(rid, ses);
+    }
+
+    function seasonTipWrite() {
+      let d   = request.resource.data;
+      let old = resource.data;
+      let y   = d.touchedSeason;
+      return d.races.diff(old.races).affectedKeys().size() == 0
+          && y is string && y.size() == 4
+          && d.season.diff(old.season).affectedKeys().hasOnly([y])
+          && d.season[y].keys().hasOnly(['wdc','wcc','flap','updatedAt'])
+          /* jen id jezdce/týmu a časové razítko — ne libovolně dlouhý text */
+          && d.season[y].get('wdc', '') is string && d.season[y].get('wdc', '').size() <= 40
+          && d.season[y].get('wcc', '') is string && d.season[y].get('wcc', '').size() <= 40
+          && d.season[y].get('flap', '') is string && d.season[y].get('flap', '').size() <= 40
+          && d.season[y].get('updatedAt', '') is string && d.season[y].get('updatedAt', '').size() <= 40
+          && seasonOpen(y);
+    }
+
+    match /config/{docId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    match /seasons/{year} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    match /races/{raceId} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    match /tips/{uid} {
+      allow read:   if true;
+      allow delete: if isAdmin();
+
+      allow create: if isAdmin() || (
+             isSelf(uid)
+          && request.resource.data.keys().hasOnly(tipKeys())
+          && request.resource.data.keys().hasAll(['nick','slug','joinedAt','races','season'])
+          && request.resource.data.nick is string
+          && request.resource.data.nick.size() >= 2
+          && request.resource.data.nick.size() <= 24
+          && request.resource.data.joinedAt is string
+          && request.resource.data.races is map
+          && request.resource.data.season is map
+          && request.resource.data.races.size()  == 0
+          && request.resource.data.season.size() == 0
+          /* slug váže přezdívku na e-mail účtu — bez toho by si šlo z konzole
+             zapsat cizí jméno. Je to stejná normalizace jako slugOf() v app.js;
+             porovnávat rovnou nick nejde, ten smí mít diakritiku a mezery. */
+          && request.resource.data.slug is string
+          && request.resource.data.slug.matches('^[a-z0-9._-]{2,40}$')
+          && request.auth.token.email ==
+             request.resource.data.slug + '@hraci.f1-tipovacka.app'
+      );
+
+      /* Do veřejného dokumentu se tip jen PŘEPISUJE ze soukromého, a to až po
+         uzávěrce. Hodnota se porovnává s privátním originálem, takže „odkrýt“
+         nejde nic jiného, než co hráč doopravdy tipoval. */
+      function raceReveal(uid) {
+        let d = request.resource.data; let old = resource.data;
+        let rid = d.touchedRace; let ses = d.touchedSession;
+        let p = privOf(uid);
+        return d.season.diff(old.season).affectedKeys().size() == 0
+            && rid is string && rid.size() > 0
+            && ses in ['quali','sprint','race']
+            && d.races.diff(old.races).affectedKeys().hasOnly([rid])
+            && d.races[rid].diff(old.races.get(rid, {})).affectedKeys().hasOnly([ses,'updatedAt'])
+            && d.races[rid].keys().hasOnly(['quali','sprint','race','updatedAt'])
+            && !raceOpen(rid, ses)
+            && d.races[rid][ses] == p.races.get(rid, {}).get(ses, []);
+      }
+      function seasonReveal(uid) {
+        let d = request.resource.data; let old = resource.data;
+        let y = d.touchedSeason; let ps = privOf(uid).season.get(y, {});
+        return d.races.diff(old.races).affectedKeys().size() == 0
+            && y is string && y.size() == 4
+            && d.season.diff(old.season).affectedKeys().hasOnly([y])
+            && d.season[y].keys().hasOnly(['wdc','wcc','flap','updatedAt'])
+            && !seasonOpen(y)
+            && d.season[y].get('wdc','')  == ps.get('wdc','')
+            && d.season[y].get('wcc','')  == ps.get('wcc','')
+            && d.season[y].get('flap','') == ps.get('flap','');
+      }
+
+      allow update: if isAdmin() || (
+             isSelf(uid)
+          && baseUnchanged()
+          && ( raceReveal(uid) || seasonReveal(uid) )
+      );
+    }
+
+    match /tips/{uid}/private/data {
+      allow read:   if isAdmin() || isSelf(uid);
+      allow delete: if isAdmin();
+
+      allow create: if isAdmin() || (
+             isSelf(uid)
+          && request.resource.data.keys().hasOnly(privKeys())
+          && request.resource.data.races.size()  == 0
+          && request.resource.data.season.size() == 0
+      );
+
+      allow update: if isAdmin() || (
+             isSelf(uid)
+          && request.resource.data.keys().hasOnly(privKeys())
+          && ( raceTipWrite() || seasonTipWrite() )
+      );
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

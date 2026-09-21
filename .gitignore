@@ -1,0 +1,4 @@
+.secrets/
+node_modules/
+original-artifact.html
+data/

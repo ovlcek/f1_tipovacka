@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; img-src 'self' data:; frame-src https://*.firebaseapp.com https://accounts.google.com">
+<title>Tipovačka F1 — správa dat</title>
+<link rel="stylesheet" href="../app.css">
+</head>
+<body>
+<main class="wrap">
+  <h2 class="sec">Správa dat</h2>
+  <p class="lead">Záloha, import a přemapování starých tipů. Jen pro správce.</p>
+  <div id="gate" class="card"><button class="btn" id="btn-login">Přihlásit se Googlem</button>
+    <p class="hint" id="who"></p></div>
+  <div id="tools" style="display:none">
+    <div class="card"><h3>Záloha</h3>
+      <p class="lead">Stáhne všechny čtyři kolekce do jednoho JSON souboru.</p>
+      <button class="btn" id="btn-backup">Stáhnout zálohu JSON</button></div>
+
+    <div class="card"><h3>Import</h3>
+      <p class="lead">Vlož obsah zálohy. Dokumenty se stejným id se přepíšou, nové přibudou.</p>
+      <textarea id="json" rows="8" style="width:100%" placeholder='{"config":{},"seasons":{},"races":{},"tips":{},"tipsPrivate":{}}'></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" id="btn-import">Importovat</button></div></div>
+
+    <div class="card"><h3>Přemapovat legacy tip</h3>
+      <p class="lead">Přenese tipy ze starého dokumentu pod účet existujícího hráče. Starý dokument se pak smaže.</p>
+      <div class="fgrid two">
+        <div><label class="f">Staré uid</label><input id="old-uid"></div>
+        <div><label class="f">Přezdívka cílového hráče</label><input id="new-nick"></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="btn-remap">Přemapovat</button></div></div>
+
+    <div class="card"><h3>Smazat hráče</h3>
+      <p class="lead">Smaže dokument hráče v <code>tips</code> i s jeho tipy. Zadej přezdívku nebo uid.</p>
+      <div><label class="f">Přezdívka nebo uid</label><input id="del-who"></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="btn-delete">Smazat hráče</button></div></div>
+  </div>
+  <pre id="log" class="note" style="white-space:pre-wrap"></pre>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="../firebase-config.js"></script>
+<script src="migrate.js"></script>
+</body>
+</html>
