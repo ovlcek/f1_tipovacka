@@ -97,6 +97,35 @@ service cloud.firestore {
           && seasonOpen(y);
     }
 
+    /* Do verejneho dokumentu se tip jen prepisuje ze soukromeho, a to az po
+       uzaverce. Hodnota se porovnava s privatnim originalem, takze odkryt
+       nejde nic jineho, nez co hrac doopravdy tipoval. */
+    function raceReveal(uid) {
+      let d = request.resource.data; let old = resource.data;
+      let rid = d.touchedRace; let ses = d.touchedSession;
+      let p = privOf(uid);
+      return d.season.diff(old.season).affectedKeys().size() == 0
+          && rid is string && rid.size() > 0
+          && ses in ['quali','sprint','race']
+          && d.races.diff(old.races).affectedKeys().hasOnly([rid])
+          && d.races[rid].diff(old.races.get(rid, {})).affectedKeys().hasOnly([ses,'updatedAt'])
+          && d.races[rid].keys().hasOnly(['quali','sprint','race','updatedAt'])
+          && !raceOpen(rid, ses)
+          && d.races[rid][ses] == p.races.get(rid, {}).get(ses, []);
+    }
+    function seasonReveal(uid) {
+      let d = request.resource.data; let old = resource.data;
+      let y = d.touchedSeason; let ps = privOf(uid).season.get(y, {});
+      return d.races.diff(old.races).affectedKeys().size() == 0
+          && y is string && y.size() == 4
+          && d.season.diff(old.season).affectedKeys().hasOnly([y])
+          && d.season[y].keys().hasOnly(['wdc','wcc','flap','updatedAt'])
+          && !seasonOpen(y)
+          && d.season[y].get('wdc','')  == ps.get('wdc','')
+          && d.season[y].get('wcc','')  == ps.get('wcc','')
+          && d.season[y].get('flap','') == ps.get('flap','');
+    }
+
     match /config/{docId} {
       allow read:  if true;
       allow write: if isAdmin();
@@ -136,35 +165,6 @@ service cloud.firestore {
           && request.auth.token.email ==
              request.resource.data.slug + '@hraci.f1-tipovacka.app'
       );
-
-      /* Do veřejného dokumentu se tip jen PŘEPISUJE ze soukromého, a to až po
-         uzávěrce. Hodnota se porovnává s privátním originálem, takže „odkrýt“
-         nejde nic jiného, než co hráč doopravdy tipoval. */
-      function raceReveal(uid) {
-        let d = request.resource.data; let old = resource.data;
-        let rid = d.touchedRace; let ses = d.touchedSession;
-        let p = privOf(uid);
-        return d.season.diff(old.season).affectedKeys().size() == 0
-            && rid is string && rid.size() > 0
-            && ses in ['quali','sprint','race']
-            && d.races.diff(old.races).affectedKeys().hasOnly([rid])
-            && d.races[rid].diff(old.races.get(rid, {})).affectedKeys().hasOnly([ses,'updatedAt'])
-            && d.races[rid].keys().hasOnly(['quali','sprint','race','updatedAt'])
-            && !raceOpen(rid, ses)
-            && d.races[rid][ses] == p.races.get(rid, {}).get(ses, []);
-      }
-      function seasonReveal(uid) {
-        let d = request.resource.data; let old = resource.data;
-        let y = d.touchedSeason; let ps = privOf(uid).season.get(y, {});
-        return d.races.diff(old.races).affectedKeys().size() == 0
-            && y is string && y.size() == 4
-            && d.season.diff(old.season).affectedKeys().hasOnly([y])
-            && d.season[y].keys().hasOnly(['wdc','wcc','flap','updatedAt'])
-            && !seasonOpen(y)
-            && d.season[y].get('wdc','')  == ps.get('wdc','')
-            && d.season[y].get('wcc','')  == ps.get('wcc','')
-            && d.season[y].get('flap','') == ps.get('flap','');
-      }
 
       allow update: if isAdmin() || (
              isSelf(uid)
