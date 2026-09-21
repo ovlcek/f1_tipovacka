@@ -205,9 +205,23 @@ function flagBdg(){
     '<rect x="0.5" y="3.5" width="23" height="17" fill="none" stroke="#8A8A8A" stroke-width="1"/></svg>';
 }
 function tyreForRank(rank){return rank===1?"soft":(rank===2?"medium":(rank===3?"hard":null));}
-function badges(uid,rank){
+/* Sezóna je skončená, jakmile má vyplněný aspoň jeden sezónní výsledek —
+   stejná podmínka jako v seasonShut(). Medaile je pak trvalá: počítá se z
+   NEJLEPŠÍHO umístění napříč všemi skončenými ročníky, takže se u jména
+   zobrazuje navždy a zlepšením v pozdější sezóně se jen vylepší, nikdy nezmizí. */
+function seasonFinished(y){var r=(season(y)||{}).results||{};return !!(r.wdc||r.wcc||r.flap);}
+function careerRank(uid){
+  var best=null;
+  years().forEach(function(y){
+    if(!seasonFinished(y))return;
+    var row=standings(y).filter(function(r){return r.uid===uid;})[0];
+    if(row&&row.rank<=3&&(best===null||row.rank<best))best=row.rank;
+  });
+  return best;
+}
+function badges(uid){
   var out="";
-  var t=tyreForRank(rank);
+  var t=tyreForRank(careerRank(uid));
   if(t)out+=tyre(t);
   if(uid&&S.vip.indexOf(uid)>=0)out+=flagBdg();
   return out;
@@ -637,10 +651,11 @@ function viewLanding(){
     '<p>Každá část víkendu má vlastní uzávěrku, která je v čase jejího startu. Do té doby si tip můžeš libovolně měnit, '+
     'potom se zamkne a odkryjí se tipy ostatních. Tipovat jde i na závody hodně dopředu.</p>'+
     '<p>Bod dostaneš za jezdce, který skončí přesně na pozici, kam jsi ho tipoval. '+
-    'Hraje se jen o žebříček, žádné ceny. První tři nosí u jména pneumatiku — '+
-    'softy, medium a hard.</p>'+
-    '<div class="legend"><span>'+tyre("soft",1)+' 1. místo</span><span>'+tyre("medium",1)+' 2. místo</span>'+
-    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor</span></div></div>';
+    'Hraje se jen o žebříček, žádné ceny. Kdo skončí sezónu v první trojce, dostane '+
+    'u jména navždy pneumatiku — softy, medium a hard. Zlepšením v pozdější sezóně se '+
+    'medaile vylepší, o získanou nejde nikdy přijít.</p>'+
+    '<div class="legend"><span>'+tyre("soft",1)+' vítěz sezóny</span><span>'+tyre("medium",1)+' 2. místo v sezóně</span>'+
+    '<span>'+tyre("hard",1)+' 3. místo v sezóně</span><span>'+flagBdg()+' editor</span></div></div>';
   out+='<div class="card"><h2 class="sec">Bodování</h2>'+
     '<h3>Kvalifikace — první tři</h3>'+ruleRow(sc.quali)+
     '<h3>Závod — první desítka</h3>'+ruleRow(sc.race)+
@@ -781,7 +796,6 @@ function viewTip(){
 function evalTable(r,s,res){
   var done=!!(res&&res.length);
   var uids=playersList().filter(function(u){return ((S.tips[u].races||{})[r.id]||{})[s.key];});
-  var rank={};standings(S.year).forEach(function(row){rank[row.uid]=row.rank;});
   var cols=[];for(var c=0;c<s.n;c++)cols.push(c);
   var head='<tr><th>Hráč</th>'+cols.map(function(i){return '<th class="n">P'+(i+1)+'</th>';}).join("")+
     '<th class="n">Body</th></tr>';
@@ -795,7 +809,7 @@ function evalTable(r,s,res){
     cols.forEach(function(i){
       var v=t[i]||"",ok=done&&res[i]&&v&&res[i]===v;
       cells+='<td class="n '+(done&&v?(ok?"hitcell":"misscell"):"")+'">'+esc(v?dCode(S.year,v):"—")+'</td>';});
-    return '<tr class="'+(u===S.me.id?"me":"")+'"><td><span class="nm">'+esc(nick(u))+badges(u,rank[u])+'</span></td>'+
+    return '<tr class="'+(u===S.me.id?"me":"")+'"><td><span class="nm">'+esc(nick(u))+badges(u)+'</span></td>'+
       cells+'<td class="n"><b>'+(done?pts(s.key,hits(t,res,s.n),scoring(S.year)):0)+'</b></td></tr>';
   }).join("");
   return '<h3>Tipy všech'+(done?" a vyhodnocení":"")+'</h3><div class="scroll"><table><thead>'+
@@ -809,7 +823,7 @@ function viewBoard(){
   var body=rows.length?rows.map(function(r){
       return '<tr class="'+(r.uid===S.me.id?"me ":"")+(r.rank===1?"p1":"")+'">'+
         '<td class="rank n">'+r.rank+'</td>'+
-        '<td><span class="nm">'+esc(nick(r.uid))+badges(r.uid,r.rank)+'</span></td>'+
+        '<td><span class="nm">'+esc(nick(r.uid))+badges(r.uid)+'</span></td>'+
         '<td class="n">'+r.season+'</td><td class="n"><b>'+r.total+'</b></td></tr>';}).join("")
     :'<tr class="p1"><td class="rank n">1</td><td class="ghostrow" colspan="3">Volno '+tyre("soft")+'</td></tr>'+
      '<tr><td class="rank n">2</td><td class="ghostrow" colspan="3">Volno '+tyre("medium")+'</td></tr>'+
@@ -818,8 +832,8 @@ function viewBoard(){
     '<p class="lead">'+(rows.length?rows.length+" přihlášených hráčů":"Zatím se nikdo nepřihlásil. Pošli kamarádům odkaz na tuhle stránku.")+'</p>'+
     '<table class="fit"><colgroup><col class="c1"><col><col class="c3"><col class="c4"></colgroup>'+
     '<thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+
-    '<div class="legend"><span>'+tyre("soft",1)+' 1. místo</span><span>'+tyre("medium",1)+' 2. místo</span>'+
-    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor</span></div></div>';
+    '<div class="legend"><span>'+tyre("soft",1)+' vítěz sezóny</span><span>'+tyre("medium",1)+' 2. místo v sezóně</span>'+
+    '<span>'+tyre("hard",1)+' 3. místo v sezóně</span><span>'+flagBdg()+' editor</span></div></div>';
 
   var scored=rs.filter(function(r){var x=r.results||{};
     return (x.quali&&x.quali.length)||(x.race&&x.race.length)||(x.sprint&&x.sprint.length);});
@@ -829,7 +843,7 @@ function viewBoard(){
       scored.map(function(r){return '<th class="n" title="'+esc(r.name||"")+'">'+esc(r.shortName||shortOf(r.name))+'</th>';}).join("")+
       '<th class="n">Σ</th></tr></thead><tbody>'+
       (rows.length?rows.map(function(row){var sum=0;scored.forEach(function(r){sum+=row.per[r.id]||0;});
-        return '<tr class="'+(row.uid===S.me.id?"me":"")+'"><td><span class="nm">'+esc(nick(row.uid))+badges(row.uid,row.rank)+'</span></td>'+
+        return '<tr class="'+(row.uid===S.me.id?"me":"")+'"><td><span class="nm">'+esc(nick(row.uid))+badges(row.uid)+'</span></td>'+
           scored.map(function(r){return '<td class="n">'+(row.per[r.id]||0)+'</td>';}).join("")+
           '<td class="n"><b>'+sum+'</b></td></tr>';}).join("")
         :'<tr><td class="ghostrow" colspan="'+(scored.length+2)+'">Zatím bez hráčů</td></tr>')+
