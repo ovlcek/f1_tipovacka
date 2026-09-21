@@ -183,7 +183,8 @@ h3:first-child{margin-top:0}
 }
 .slot.podium .pos{background:var(--red);color:#fff}
 .slot .tb{width:5px;flex:none;background:transparent;transition:background .15s}
-.slot select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:15px;padding:10px 8px;appearance:none}
+.slot select{flex:1;min-width:0;border:0;background:var(--panel2);color:var(--ink);font-family:inherit;font-size:15px;padding:10px 8px;appearance:none}
+.slot select option{background:var(--panel2);color:var(--ink)}
 .slot select:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 .slot.dupe{border-color:var(--bad)}
 .slot.wrong .pos{opacity:.65}

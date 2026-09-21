@@ -1245,6 +1245,15 @@ document.addEventListener("click",function(ev){
     sessOf(r3).forEach(function(x){
       var a=readSlots("res:"+id+":"+x.key,x.n,(r3.results&&r3.results[x.key])||[]);
       if(a.filter(Boolean).length)res[x.key]=a;});
+    /* Zadané výsledky znamenají, že daná část víkendu skončila — uzávěrku
+       zavřeme i kdyby formálně měla být ještě v budoucnu. Bez toho by se tipy
+       hráčů neodkryly a appka by ukázala 0 bodů, přestože výsledky sedí.
+       Mutujeme r3 přímo (je to odkaz do S.races), aby to hned viděl i
+       revealSweep níže, který čte deadline přes stejné pole. */
+    Object.keys(res).forEach(function(k){
+      var dl=(SESSIONS.filter(function(s){return s.key===k;})[0]||{}).dl;
+      if(dl&&!isShut(r3[dl]))r3[dl]=new Date().toISOString();
+    });
     var nx=JSON.parse(JSON.stringify(r3));delete nx.id;nx.results=res;
     /* Odkrytí tipů musí doběhnout dřív než uložení výsledků — jinak by se hráčům
        ukázaly body u tipů, které ještě nejsou vidět. Když selže, výsledky neukládáme. */
