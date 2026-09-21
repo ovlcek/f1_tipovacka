@@ -11,7 +11,7 @@ var FIREBASE_CONFIG = {
 
 /* Doplň po prvním přihlášení Googlem (Firebase Console → Authentication → Users → User UID).
    Stejné UID patří i do firestore.rules místo ADMIN_GOOGLE_UID_DOPLNIT. */
-var ADMIN_UID = "ADMIN_GOOGLE_UID_DOPLNIT";
+var ADMIN_UID = "pyKv3EvbHMbS6Azp7KxsoVzGO0B2";
 
 /* Hráči se přihlašují přezdívkou; doména je jen technický obal pro e-mailové přihlášení. */
 var PLAYER_MAIL_DOMAIN = "hraci.f1-tipovacka.app";
