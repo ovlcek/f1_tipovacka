@@ -200,8 +200,8 @@ function flagBdg(){
   var cells="";
   for(var r=0;r<3;r++)for(var c=0;c<4;c++)
     if((r+c)%2===0)cells+='<rect x="'+(c*6)+'" y="'+(3+r*6)+'" width="6" height="6" fill="#101010"/>';
-  return '<svg class="bdg" viewBox="0 0 24 24" role="img" aria-label="Editor nebo VIP">'+
-    '<title>Editor / VIP</title><rect x="0" y="3" width="24" height="18" fill="#fff"/>'+cells+
+  return '<svg class="bdg" viewBox="0 0 24 24" role="img" aria-label="Editor">'+
+    '<title>Editor</title><rect x="0" y="3" width="24" height="18" fill="#fff"/>'+cells+
     '<rect x="0.5" y="3.5" width="23" height="17" fill="none" stroke="#8A8A8A" stroke-width="1"/></svg>';
 }
 function tyreForRank(rank){return rank===1?"soft":(rank===2?"medium":(rank===3?"hard":null));}
@@ -640,7 +640,7 @@ function viewLanding(){
     'Hraje se jen o žebříček, žádné ceny. První tři nosí u jména pneumatiku — '+
     'softy, medium a hard.</p>'+
     '<div class="legend"><span>'+tyre("soft",1)+' 1. místo</span><span>'+tyre("medium",1)+' 2. místo</span>'+
-    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor nebo VIP</span></div></div>';
+    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor</span></div></div>';
   out+='<div class="card"><h2 class="sec">Bodování</h2>'+
     '<h3>Kvalifikace — první tři</h3>'+ruleRow(sc.quali)+
     '<h3>Závod — první desítka</h3>'+ruleRow(sc.race)+
@@ -819,7 +819,7 @@ function viewBoard(){
     '<table class="fit"><colgroup><col class="c1"><col><col class="c3"><col class="c4"></colgroup>'+
     '<thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+
     '<div class="legend"><span>'+tyre("soft",1)+' 1. místo</span><span>'+tyre("medium",1)+' 2. místo</span>'+
-    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor nebo VIP</span></div></div>';
+    '<span>'+tyre("hard",1)+' 3. místo</span><span>'+flagBdg()+' editor</span></div></div>';
 
   var scored=rs.filter(function(r){var x=r.results||{};
     return (x.quali&&x.quali.length)||(x.race&&x.race.length)||(x.sprint&&x.sprint.length);});
@@ -1089,7 +1089,7 @@ function adminPlayers(){
         '<td class="n">'+(((d.season||{})[String(S.year)]||(pv.season||{})[String(S.year)])?'<span class="tag on">ano</span>':'<span class="tag">–</span>')+'</td></tr>';
     }).join("")+'</tbody></table></div>'+
     (S.adminPriv?"":'<div class="note">Načítám odevzdané tipy před uzávěrkou…</div>')+
-    '<div class="note">Vlajka označuje editory a VIP. Číslo je počet vyplněných částí víkendu (kvalifikace / sprint / závod).</div></div>';
+    '<div class="note">Vlajka označuje editory. Číslo je počet vyplněných částí víkendu (kvalifikace / sprint / závod).</div></div>';
   return out;
 }
 
